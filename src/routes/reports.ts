@@ -1,42 +1,45 @@
-import { Router, Request, Response } from 'express';
-import { getDb } from '../db/index.js';
+import { Router, type Request, type Response } from 'express';
+import { getClient, row0, rowsAll } from '../db/index.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { asyncRoute } from '../util/asyncRoute.js';
 
 export const reportsRouter = Router();
 reportsRouter.use(authMiddleware);
 
-reportsRouter.get('/dashboard', (_req: Request, res: Response) => {
-  const db = getDb();
+reportsRouter.get(
+  '/dashboard',
+  asyncRoute(async (_req: Request, res: Response) => {
+    const db = getClient();
 
-  const products = db.prepare('SELECT COUNT(*) as c FROM products').get() as { c: number };
-  const lowStock = db
-    .prepare(
-      `SELECT COUNT(*) as c FROM products
+    const products = row0<{ c: number }>(await db.execute('SELECT COUNT(*) as c FROM products'));
+    const lowStock = row0<{ c: number }>(
+      await db.execute(
+        `SELECT COUNT(*) as c FROM products
        WHERE low_stock_threshold > 0 AND stock_quantity <= low_stock_threshold`
-    )
-    .get() as { c: number };
+      )
+    );
 
-  // today range
-  const todayStart = db.prepare(`SELECT datetime('now','start of day') as v`).get() as { v: string };
-  const todayEnd = db.prepare(`SELECT datetime('now','start of day','+1 day','-1 second') as v`).get() as { v: string };
+    const todayStart = row0<{ v: string }>(await db.execute(`SELECT datetime('now','start of day') as v`));
+    const todayEnd = row0<{ v: string }>(await db.execute(`SELECT datetime('now','start of day','+1 day','-1 second') as v`));
 
-  const purchaseToday = db
-    .prepare(
-      `SELECT COALESCE(SUM(total_amount),0) as total, COUNT(*) as count
-       FROM purchase_orders WHERE created_at >= ? AND created_at <= ?`
-    )
-    .get(todayStart.v, todayEnd.v) as { total: number; count: number };
-  const salesToday = db
-    .prepare(
-      `SELECT COALESCE(SUM(total_amount),0) as total, COUNT(*) as count
-       FROM sales_orders WHERE created_at >= ? AND created_at <= ?`
-    )
-    .get(todayStart.v, todayEnd.v) as { total: number; count: number };
+    const purchaseToday = row0<{ total: number; count: number }>(
+      await db.execute(
+        `SELECT COALESCE(SUM(total_amount),0) as total, COUNT(*) as count
+       FROM purchase_orders WHERE created_at >= ? AND created_at <= ?`,
+        [todayStart!.v, todayEnd!.v]
+      )
+    );
+    const salesToday = row0<{ total: number; count: number }>(
+      await db.execute(
+        `SELECT COALESCE(SUM(total_amount),0) as total, COUNT(*) as count
+       FROM sales_orders WHERE created_at >= ? AND created_at <= ?`,
+        [todayStart!.v, todayEnd!.v]
+      )
+    );
 
-  // last 7 days trend (including today): group by date
-  const trend = db
-    .prepare(
-      `WITH RECURSIVE dates(d) AS (
+    const trend = rowsAll<{ date: string; purchase_total: number; sales_total: number }>(
+      await db.execute(
+        `WITH RECURSIVE dates(d) AS (
          SELECT date('now','-6 day')
          UNION ALL
          SELECT date(d,'+1 day') FROM dates WHERE d < date('now')
@@ -47,30 +50,33 @@ reportsRouter.get('/dashboard', (_req: Request, res: Response) => {
          COALESCE((SELECT SUM(total_amount) FROM sales_orders WHERE date(created_at) = d),0) as sales_total
        FROM dates
        ORDER BY d ASC`
-    )
-    .all() as { date: string; purchase_total: number; sales_total: number }[];
+      )
+    );
 
-  res.json({
-    products_count: products.c,
-    low_stock_count: lowStock.c,
-    purchase_today_total: Number(purchaseToday.total),
-    purchase_today_count: purchaseToday.count,
-    sales_today_total: Number(salesToday.total),
-    sales_today_count: salesToday.count,
-    trend,
-  });
-});
+    res.json({
+      products_count: products?.c ?? 0,
+      low_stock_count: lowStock?.c ?? 0,
+      purchase_today_total: Number(purchaseToday?.total ?? 0),
+      purchase_today_count: purchaseToday?.count ?? 0,
+      sales_today_total: Number(salesToday?.total ?? 0),
+      sales_today_count: salesToday?.count ?? 0,
+      trend,
+    });
+  })
+);
 
-reportsRouter.get('/trend', (req: Request, res: Response) => {
-  const { from, to } = req.query;
-  if (!from || typeof from !== 'string' || !to || typeof to !== 'string') {
-    res.status(400).json({ error: 'from and to required (YYYY-MM-DD)' });
-    return;
-  }
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `WITH RECURSIVE dates(d) AS (
+reportsRouter.get(
+  '/trend',
+  asyncRoute(async (req: Request, res: Response) => {
+    const { from, to } = req.query;
+    if (!from || typeof from !== 'string' || !to || typeof to !== 'string') {
+      res.status(400).json({ error: 'from and to required (YYYY-MM-DD)' });
+      return;
+    }
+    const db = getClient();
+    const rows = rowsAll<{ date: string; purchase_total: number; sales_total: number }>(
+      await db.execute(
+        `WITH RECURSIVE dates(d) AS (
          SELECT date(?)
          UNION ALL
          SELECT date(d,'+1 day') FROM dates WHERE d < date(?)
@@ -80,40 +86,49 @@ reportsRouter.get('/trend', (req: Request, res: Response) => {
          COALESCE((SELECT SUM(total_amount) FROM purchase_orders WHERE date(created_at) = d),0) as purchase_total,
          COALESCE((SELECT SUM(total_amount) FROM sales_orders WHERE date(created_at) = d),0) as sales_total
        FROM dates
-       ORDER BY d ASC`
-    )
-    .all(from, to) as { date: string; purchase_total: number; sales_total: number }[];
-  res.json({ list: rows });
-});
+       ORDER BY d ASC`,
+        [from, to]
+      )
+    );
+    res.json({ list: rows });
+  })
+);
 
-reportsRouter.get('/summary', (req: Request, res: Response) => {
-  const { from, to } = req.query;
-  const db = getDb();
-  let purchaseWhere = '';
-  let saleWhere = '';
-  const purchaseParams: string[] = [];
-  const saleParams: string[] = [];
-  if (from && typeof from === 'string') {
-    purchaseWhere += ' AND created_at >= ?';
-    saleWhere += ' AND created_at >= ?';
-    purchaseParams.push(from);
-    saleParams.push(from);
-  }
-  if (to && typeof to === 'string') {
-    purchaseWhere += ' AND created_at <= ?';
-    saleWhere += ' AND created_at <= ?';
-    purchaseParams.push(to + ' 23:59:59');
-    saleParams.push(to + ' 23:59:59');
-  }
-  const purchaseRow = db.prepare(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM purchase_orders WHERE 1=1 ${purchaseWhere}`).get(...purchaseParams) as { total: number; count: number };
-  const saleRow = db.prepare(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM sales_orders WHERE 1=1 ${saleWhere}`).get(...saleParams) as { total: number; count: number };
-  const purchaseTotal = Number(purchaseRow.total);
-  const saleTotal = Number(saleRow.total);
-  res.json({
-    purchase_total: purchaseTotal,
-    purchase_count: purchaseRow.count,
-    sales_total: saleTotal,
-    sales_count: saleRow.count,
-    gross_profit: saleTotal - purchaseTotal,
-  });
-});
+reportsRouter.get(
+  '/summary',
+  asyncRoute(async (req: Request, res: Response) => {
+    const { from, to } = req.query;
+    const db = getClient();
+    let purchaseWhere = '';
+    let saleWhere = '';
+    const purchaseParams: string[] = [];
+    const saleParams: string[] = [];
+    if (from && typeof from === 'string') {
+      purchaseWhere += ' AND created_at >= ?';
+      saleWhere += ' AND created_at >= ?';
+      purchaseParams.push(from);
+      saleParams.push(from);
+    }
+    if (to && typeof to === 'string') {
+      purchaseWhere += ' AND created_at <= ?';
+      saleWhere += ' AND created_at <= ?';
+      purchaseParams.push(to + ' 23:59:59');
+      saleParams.push(to + ' 23:59:59');
+    }
+    const purchaseRow = row0<{ total: number; count: number }>(
+      await db.execute(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM purchase_orders WHERE 1=1 ${purchaseWhere}`, purchaseParams)
+    );
+    const saleRow = row0<{ total: number; count: number }>(
+      await db.execute(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM sales_orders WHERE 1=1 ${saleWhere}`, saleParams)
+    );
+    const purchaseTotal = Number(purchaseRow?.total ?? 0);
+    const saleTotal = Number(saleRow?.total ?? 0);
+    res.json({
+      purchase_total: purchaseTotal,
+      purchase_count: purchaseRow?.count ?? 0,
+      sales_total: saleTotal,
+      sales_count: saleRow?.count ?? 0,
+      gross_profit: saleTotal - purchaseTotal,
+    });
+  })
+);

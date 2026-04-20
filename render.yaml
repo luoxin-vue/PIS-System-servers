@@ -1,5 +1,5 @@
-# Render Blueprint（后端独立仓库）：Dashboard → New → Blueprint
-# 免费实例磁盘临时，SQLite 可能在休眠/重部署后丢失；持久化需付费实例 + Disk，并设 DB_PATH=/var/data/inventory.db
+# Render Blueprint：Turso 托管数据库（免费额度见 https://turso.tech/pricing）
+# 在 Turso 控制台创建数据库后，把 Database URL 与 Token 填到 Render 服务环境变量（Blueprint 首次创建后需在 Dashboard 手动添加，见下方 sync: false）。
 services:
   - type: web
     name: inventory-api
@@ -16,11 +16,11 @@ services:
         generateValue: true
       - key: INITIAL_ADMIN_USERNAME
         value: admin
-      # 生产建议在控制台添加 INITIAL_ADMIN_PASSWORD
-      # 持久化 SQLite 示例（需付费 + disk）：
-      # - key: DB_PATH
-      #   value: /var/data/inventory.db
-    # disk:
-    #   name: inventory-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      # 可选：覆盖默认管理员密码（首次无用户时种子账户）
+      # - key: INITIAL_ADMIN_PASSWORD
+      #   sync: false
+      # 不设 TURSO_* 时本地/默认仍可用 file: 本地 SQLite（仅开发）；Render 上请务必配置 Turso。
