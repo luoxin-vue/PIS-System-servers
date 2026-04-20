@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { sendError } from '../util/httpError.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'maxxis-inventory-secret-change-in-production';
 
@@ -11,7 +12,7 @@ export interface JwtPayload {
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing or invalid Authorization header' });
+    sendError(res, 401, 'AUTH_HEADER_MISSING', 'Missing or invalid Authorization header');
     return;
   }
   const token = authHeader.slice(7);
@@ -20,7 +21,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     (req as Request & { user?: JwtPayload }).user = decoded;
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    sendError(res, 401, 'AUTH_TOKEN_INVALID', 'Invalid or expired token');
   }
 }
 

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getClient, row0, rowsAll, insertId } from '../db/index.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncRoute } from '../util/asyncRoute.js';
+import { sendError } from '../util/httpError.js';
 
 export const purchasesRouter = Router();
 purchasesRouter.use(authMiddleware);
@@ -41,7 +42,7 @@ purchasesRouter.get(
       )
     );
     if (!order) {
-      res.status(404).json({ error: 'Purchase order not found' });
+      sendError(res, 404, 'PURCHASE_NOT_FOUND', 'Purchase order not found');
       return;
     }
     const items = rowsAll<Record<string, unknown>>(
@@ -64,7 +65,7 @@ purchasesRouter.post(
       items: { product_id: number; quantity: number; unit_price: number }[];
     };
     if (!supplier_id || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ error: 'supplier_id and items (array) required' });
+      sendError(res, 400, 'PURCHASE_INVALID_BODY', 'supplier_id and items (array) required');
       return;
     }
     const db = getClient();

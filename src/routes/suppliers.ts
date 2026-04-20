@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getClient, row0, rowsAll, insertId } from '../db/index.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncRoute } from '../util/asyncRoute.js';
+import { sendError } from '../util/httpError.js';
 
 export const suppliersRouter = Router();
 suppliersRouter.use(authMiddleware);
@@ -36,7 +37,7 @@ suppliersRouter.get(
     const db = getClient();
     const row = row0(await db.execute('SELECT * FROM suppliers WHERE id = ?', [Number(req.params.id)]));
     if (!row) {
-      res.status(404).json({ error: 'Supplier not found' });
+      sendError(res, 404, 'SUPPLIER_NOT_FOUND', 'Supplier not found');
       return;
     }
     res.json(row);
@@ -48,7 +49,7 @@ suppliersRouter.post(
   asyncRoute(async (req: Request, res: Response) => {
     const { name, contact, phone, note } = req.body;
     if (!name) {
-      res.status(400).json({ error: 'name required' });
+      sendError(res, 400, 'SUPPLIER_NAME_REQUIRED', 'name required');
       return;
     }
     const db = getClient();
@@ -71,7 +72,7 @@ suppliersRouter.put(
     const db = getClient();
     const existing = row0(await db.execute('SELECT id FROM suppliers WHERE id = ?', [id]));
     if (!existing) {
-      res.status(404).json({ error: 'Supplier not found' });
+      sendError(res, 404, 'SUPPLIER_NOT_FOUND', 'Supplier not found');
       return;
     }
     await db.execute('UPDATE suppliers SET name=?, contact=?, phone=?, note=? WHERE id = ?', [
@@ -93,7 +94,7 @@ suppliersRouter.delete(
     const db = getClient();
     const result = await db.execute('DELETE FROM suppliers WHERE id = ?', [id]);
     if (result.rowsAffected === 0) {
-      res.status(404).json({ error: 'Supplier not found' });
+      sendError(res, 404, 'SUPPLIER_NOT_FOUND', 'Supplier not found');
       return;
     }
     res.status(204).send();

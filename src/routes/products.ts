@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getClient, row0, rowsAll, insertId } from '../db/index.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncRoute } from '../util/asyncRoute.js';
+import { sendError } from '../util/httpError.js';
 
 export const productsRouter = Router();
 productsRouter.use(authMiddleware);
@@ -37,7 +38,7 @@ productsRouter.get(
     const db = getClient();
     const row = row0(await db.execute('SELECT * FROM products WHERE id = ?', [Number(req.params.id)]));
     if (!row) {
-      res.status(404).json({ error: 'Product not found' });
+      sendError(res, 404, 'PRODUCT_NOT_FOUND', 'Product not found');
       return;
     }
     res.json(row);
@@ -49,7 +50,7 @@ productsRouter.post(
   asyncRoute(async (req: Request, res: Response) => {
     const { name, brand, model, size, cost_price, sale_price, stock_quantity, low_stock_threshold } = req.body;
     if (!name || !brand || !model || !size) {
-      res.status(400).json({ error: 'name, brand, model, size required' });
+      sendError(res, 400, 'PRODUCT_FIELDS_REQUIRED', 'name, brand, model, size required');
       return;
     }
     const db = getClient();
@@ -80,7 +81,7 @@ productsRouter.put(
     const db = getClient();
     const existing = row0(await db.execute('SELECT id FROM products WHERE id = ?', [id]));
     if (!existing) {
-      res.status(404).json({ error: 'Product not found' });
+      sendError(res, 404, 'PRODUCT_NOT_FOUND', 'Product not found');
       return;
     }
     await db.execute(
@@ -110,7 +111,7 @@ productsRouter.delete(
     const db = getClient();
     const result = await db.execute('DELETE FROM products WHERE id = ?', [id]);
     if (result.rowsAffected === 0) {
-      res.status(404).json({ error: 'Product not found' });
+      sendError(res, 404, 'PRODUCT_NOT_FOUND', 'Product not found');
       return;
     }
     res.status(204).send();

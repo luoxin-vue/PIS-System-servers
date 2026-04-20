@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getClient, row0, rowsAll, insertId } from '../db/index.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncRoute } from '../util/asyncRoute.js';
+import { sendError } from '../util/httpError.js';
 
 export const salesRouter = Router();
 salesRouter.use(authMiddleware);
@@ -30,7 +31,7 @@ salesRouter.get(
     const db = getClient();
     const order = row0(await db.execute('SELECT * FROM sales_orders WHERE id = ?', [Number(req.params.id)]));
     if (!order) {
-      res.status(404).json({ error: 'Sales order not found' });
+      sendError(res, 404, 'SALES_NOT_FOUND', 'Sales order not found');
       return;
     }
     const items = rowsAll<Record<string, unknown>>(
@@ -53,7 +54,7 @@ salesRouter.post(
       items: { product_id: number; quantity: number; unit_price: number }[];
     };
     if (!items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({ error: 'items (array) required' });
+      sendError(res, 400, 'SALES_ITEMS_REQUIRED', 'items (array) required');
       return;
     }
     const db = getClient();
@@ -80,7 +81,9 @@ salesRouter.post(
         const product = row0<{ stock_quantity: number }>(productRs);
         if (!product || product.stock_quantity < quantity) {
           await tx.rollback();
-          res.status(400).json({ error: `Insufficient stock for product id ${product_id}` });
+          sendError(res, 400, 'SALES_INSUFFICIENT_STOCK', 'Insufficient stock for product', {
+            productId: product_id,
+          });
           return;
         }
         await tx.execute({

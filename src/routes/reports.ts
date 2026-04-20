@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getClient, row0, rowsAll } from '../db/index.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncRoute } from '../util/asyncRoute.js';
+import { sendError } from '../util/httpError.js';
 
 export const reportsRouter = Router();
 reportsRouter.use(authMiddleware);
@@ -70,7 +71,7 @@ reportsRouter.get(
   asyncRoute(async (req: Request, res: Response) => {
     const { from, to } = req.query;
     if (!from || typeof from !== 'string' || !to || typeof to !== 'string') {
-      res.status(400).json({ error: 'from and to required (YYYY-MM-DD)' });
+      sendError(res, 400, 'REPORTS_RANGE_REQUIRED', 'from and to required (YYYY-MM-DD)');
       return;
     }
     const db = getClient();

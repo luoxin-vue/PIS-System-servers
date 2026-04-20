@@ -12,6 +12,7 @@ import { purchasesRouter } from './routes/purchases.js';
 import { salesRouter } from './routes/sales.js';
 import { inventoryRouter } from './routes/inventory.js';
 import { reportsRouter } from './routes/reports.js';
+import { sendError } from './util/httpError.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,7 +55,7 @@ async function main(): Promise<void> {
 
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
+    sendError(res, 500, 'INTERNAL_ERROR', 'Internal server error');
   });
 
   const PORT = Number(process.env.PORT) || 3000;
