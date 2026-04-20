@@ -1,0 +1,26 @@
+# Render Blueprint（后端独立仓库）：Dashboard → New → Blueprint
+# 免费实例磁盘临时，SQLite 可能在休眠/重部署后丢失；持久化需付费实例 + Disk，并设 DB_PATH=/var/data/inventory.db
+services:
+  - type: web
+    name: inventory-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: INITIAL_ADMIN_USERNAME
+        value: admin
+      # 生产建议在控制台添加 INITIAL_ADMIN_PASSWORD
+      # 持久化 SQLite 示例（需付费 + disk）：
+      # - key: DB_PATH
+      #   value: /var/data/inventory.db
+    # disk:
+    #   name: inventory-data
+    #   mountPath: /var/data
+    #   sizeGB: 1

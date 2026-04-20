@@ -1,9 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
 import path from 'path';
 import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { initDb } from './db/index.js';
+import { initDb, getDb } from './db/index.js';
 import { authRouter } from './routes/auth.js';
 import { productsRouter } from './routes/products.js';
 import { suppliersRouter } from './routes/suppliers.js';
@@ -14,6 +15,18 @@ import { reportsRouter } from './routes/reports.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 initDb();
+
+function seedDefaultUserIfEmpty(): void {
+  const db = getDb();
+  const existing = db.prepare('SELECT id FROM users LIMIT 1').get();
+  if (existing) return;
+  const username = process.env.INITIAL_ADMIN_USERNAME?.trim() || 'admin';
+  const password = process.env.INITIAL_ADMIN_PASSWORD || 'admin123';
+  const hash = bcrypt.hashSync(password, 10);
+  db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, hash);
+  console.log(`Default user created: ${username} (set INITIAL_ADMIN_USERNAME / INITIAL_ADMIN_PASSWORD to customize)`);
+}
+seedDefaultUserIfEmpty();
 
 const app = express();
 app.use(cors());
