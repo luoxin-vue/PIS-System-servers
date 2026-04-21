@@ -23,10 +23,9 @@ suppliersRouter.get(
     sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
     params.push(Number(limit), offset);
     const list = rowsAll<Record<string, unknown>>(await db.execute(sql, params));
-    const countSql = 'SELECT COUNT(*) as c FROM suppliers' + (q ? ' WHERE name LIKE ? OR contact LIKE ? OR phone LIKE ?' : '');
-    const countRow = row0<{ c: number }>(
-      await db.execute(countSql, q ? [`%${q}%`, `%${q}%`, `%${q}%`] : [])
-    );
+    const countSql =
+      'SELECT COUNT(*) as c FROM suppliers' + (q ? ' WHERE name LIKE ? OR contact LIKE ? OR phone LIKE ?' : '');
+    const countRow = row0<{ c: number }>(await db.execute(countSql, q ? [`%${q}%`, `%${q}%`, `%${q}%`] : []));
     res.json({ list, total: countRow?.c ?? 0 });
   })
 );

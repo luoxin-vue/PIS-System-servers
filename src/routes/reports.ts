@@ -21,7 +21,9 @@ reportsRouter.get(
     );
 
     const todayStart = row0<{ v: string }>(await db.execute(`SELECT datetime('now','start of day') as v`));
-    const todayEnd = row0<{ v: string }>(await db.execute(`SELECT datetime('now','start of day','+1 day','-1 second') as v`));
+    const todayEnd = row0<{ v: string }>(
+      await db.execute(`SELECT datetime('now','start of day','+1 day','-1 second') as v`)
+    );
 
     const purchaseToday = row0<{ total: number; count: number }>(
       await db.execute(
@@ -129,10 +131,16 @@ reportsRouter.get(
       saleParams.push(to + ' 23:59:59');
     }
     const purchaseRow = row0<{ total: number; count: number }>(
-      await db.execute(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM purchase_orders WHERE 1=1 ${purchaseWhere}`, purchaseParams)
+      await db.execute(
+        `SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM purchase_orders WHERE 1=1 ${purchaseWhere}`,
+        purchaseParams
+      )
     );
     const saleRow = row0<{ total: number; count: number }>(
-      await db.execute(`SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM sales_orders WHERE 1=1 ${saleWhere}`, saleParams)
+      await db.execute(
+        `SELECT COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count FROM sales_orders WHERE 1=1 ${saleWhere}`,
+        saleParams
+      )
     );
     const purchaseTotal = Number(purchaseRow?.total ?? 0);
     const saleTotal = Number(saleRow?.total ?? 0);

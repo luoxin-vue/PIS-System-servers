@@ -75,7 +75,7 @@ purchasesRouter.post(
       total_amount += Number(it.quantity) * Number(it.unit_price);
     }
 
-    let purchase_id = 0;
+    let purchase_id: number | undefined;
     const tx = await db.transaction('write');
     try {
       const orderResult = await tx.execute({
@@ -104,6 +104,10 @@ purchasesRouter.post(
       await tx.commit();
     } finally {
       tx.close();
+    }
+    if (purchase_id === undefined) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'Failed to create purchase order');
+      return;
     }
 
     const order = row0(

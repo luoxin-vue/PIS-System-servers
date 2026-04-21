@@ -12,7 +12,8 @@ inventoryRouter.get(
     const db = getClient();
     const { q, page = '1', limit = '50' } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
-    let sql = 'SELECT id, name, brand, model, size, cost_price, sale_price, stock_quantity, low_stock_threshold FROM products';
+    let sql =
+      'SELECT id, name, brand, model, size, cost_price, sale_price, stock_quantity, low_stock_threshold FROM products';
     const params: (string | number)[] = [];
     if (q && typeof q === 'string') {
       sql += ' WHERE name LIKE ? OR brand LIKE ? OR model LIKE ? OR size LIKE ?';
@@ -24,7 +25,8 @@ inventoryRouter.get(
     const list = rowsAll<Record<string, unknown>>(await db.execute(sql, params));
     const countRow = row0<{ c: number }>(
       await db.execute(
-        'SELECT COUNT(*) as c FROM products' + (q ? ' WHERE name LIKE ? OR brand LIKE ? OR model LIKE ? OR size LIKE ?' : ''),
+        'SELECT COUNT(*) as c FROM products' +
+          (q ? ' WHERE name LIKE ? OR brand LIKE ? OR model LIKE ? OR size LIKE ?' : ''),
         q ? [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`] : []
       )
     );

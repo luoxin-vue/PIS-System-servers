@@ -46,7 +46,10 @@ authRouter.post(
       return;
     }
     const password_hash = bcrypt.hashSync(password, 10);
-    const ins = await db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', [username, password_hash]);
+    const ins = await db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)', [
+      username,
+      password_hash,
+    ]);
     const id = Number(ins.lastInsertRowid ?? 0);
     const token = signToken({ userId: id, username });
     res.status(201).json({ token, username });

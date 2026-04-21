@@ -58,10 +58,9 @@ productsRouter.get(
     params.push(Number(limit), offset);
     const list = rowsAll<Record<string, unknown>>(await db.execute(sql, params));
     const countSql =
-      'SELECT COUNT(*) as c FROM products' + (q ? ' WHERE name LIKE ? OR brand LIKE ? OR model LIKE ? OR size LIKE ?' : '');
-    const countRow = row0<{ c: number }>(
-      await db.execute(countSql, q ? [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`] : [])
-    );
+      'SELECT COUNT(*) as c FROM products' +
+      (q ? ' WHERE name LIKE ? OR brand LIKE ? OR model LIKE ? OR size LIKE ?' : '');
+    const countRow = row0<{ c: number }>(await db.execute(countSql, q ? [`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`] : []));
     res.json({ list, total: countRow?.c ?? 0 });
   })
 );
@@ -82,7 +81,8 @@ productsRouter.get(
 productsRouter.post(
   '/',
   asyncRoute(async (req: Request, res: Response) => {
-    const { name, brand, model, size, image_url, cost_price, sale_price, stock_quantity, low_stock_threshold } = req.body;
+    const { name, brand, model, size, image_url, cost_price, sale_price, stock_quantity, low_stock_threshold } =
+      req.body;
     if (!name || !brand || !model || !size) {
       sendError(res, 400, 'PRODUCT_FIELDS_REQUIRED', 'name, brand, model, size required');
       return;
@@ -112,7 +112,8 @@ productsRouter.put(
   '/:id',
   asyncRoute(async (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const { name, brand, model, size, image_url, cost_price, sale_price, stock_quantity, low_stock_threshold } = req.body;
+    const { name, brand, model, size, image_url, cost_price, sale_price, stock_quantity, low_stock_threshold } =
+      req.body;
     const db = getClient();
     const existing = row0(await db.execute('SELECT id FROM products WHERE id = ?', [id]));
     if (!existing) {
@@ -128,10 +129,10 @@ productsRouter.put(
         model ?? '',
         size ?? '',
         image_url ?? '',
-        Number(cost_price) ?? 0,
-        Number(sale_price) ?? 0,
-        Number(stock_quantity) ?? 0,
-        Number(low_stock_threshold) ?? 0,
+        Number(cost_price) || 0,
+        Number(sale_price) || 0,
+        Number(stock_quantity) || 0,
+        Number(low_stock_threshold) || 0,
         id,
       ]
     );

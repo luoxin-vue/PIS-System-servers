@@ -64,7 +64,7 @@ salesRouter.post(
       total_amount += Number(it.quantity) * Number(it.unit_price);
     }
 
-    let sale_id = 0;
+    let sale_id: number | undefined;
     const tx = await db.transaction('write');
     try {
       const orderResult = await tx.execute({
@@ -77,7 +77,10 @@ salesRouter.post(
         const quantity = Number(it.quantity);
         const unit_price = Number(it.unit_price);
         const amount = quantity * unit_price;
-        const productRs = await tx.execute({ sql: 'SELECT stock_quantity FROM products WHERE id = ?', args: [product_id] });
+        const productRs = await tx.execute({
+          sql: 'SELECT stock_quantity FROM products WHERE id = ?',
+          args: [product_id],
+        });
         const product = row0<{ stock_quantity: number }>(productRs);
         if (!product || product.stock_quantity < quantity) {
           await tx.rollback();
@@ -102,6 +105,10 @@ salesRouter.post(
       await tx.commit();
     } finally {
       tx.close();
+    }
+    if (sale_id === undefined) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'Failed to create sales order');
+      return;
     }
 
     const order = row0(await db.execute('SELECT * FROM sales_orders WHERE id = ?', [sale_id]));
