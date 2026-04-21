@@ -35,6 +35,11 @@ export async function initDb(): Promise<void> {
   const c = getClient();
   await c.execute('PRAGMA foreign_keys = ON');
   await c.executeMultiple(schema);
+  const productColsRs = await c.execute('PRAGMA table_info(products)');
+  const hasImageUrl = productColsRs.rows.some((row) => String((row as Record<string, unknown>).name) === 'image_url');
+  if (!hasImageUrl) {
+    await c.execute('ALTER TABLE products ADD COLUMN image_url TEXT');
+  }
 }
 
 export function row0<T extends Record<string, unknown>>(rs: ResultSet): T | undefined {

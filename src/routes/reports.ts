@@ -38,19 +38,31 @@ reportsRouter.get(
       )
     );
 
+    const trendEndDate = row0<{ v: string }>(
+      await db.execute(
+        `SELECT COALESCE(MAX(d), date('now')) as v
+       FROM (
+         SELECT date(MAX(created_at)) as d FROM purchase_orders
+         UNION ALL
+         SELECT date(MAX(created_at)) as d FROM sales_orders
+       ) t`
+      )
+    );
+
     const trend = rowsAll<{ date: string; purchase_total: number; sales_total: number }>(
       await db.execute(
         `WITH RECURSIVE dates(d) AS (
-         SELECT date('now','-6 day')
+         SELECT date(?,'-6 day')
          UNION ALL
-         SELECT date(d,'+1 day') FROM dates WHERE d < date('now')
+         SELECT date(d,'+1 day') FROM dates WHERE d < date(?)
        )
        SELECT
          d as date,
          COALESCE((SELECT SUM(total_amount) FROM purchase_orders WHERE date(created_at) = d),0) as purchase_total,
          COALESCE((SELECT SUM(total_amount) FROM sales_orders WHERE date(created_at) = d),0) as sales_total
        FROM dates
-       ORDER BY d ASC`
+       ORDER BY d ASC`,
+        [trendEndDate?.v ?? 'now', trendEndDate?.v ?? 'now']
       )
     );
 

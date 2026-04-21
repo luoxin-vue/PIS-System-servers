@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS products (
   brand TEXT NOT NULL,
   model TEXT NOT NULL,
   size TEXT NOT NULL,
+  image_url TEXT,
   cost_price REAL NOT NULL DEFAULT 0,
   sale_price REAL NOT NULL DEFAULT 0,
   stock_quantity INTEGER NOT NULL DEFAULT 0,
